@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chiptune player</title>
+  <style>
+    :root { color-scheme: dark; font: 16px/1.5 ui-monospace, monospace; }
+    body { max-width: 42rem; margin: 4rem auto; padding: 0 1rem; background: #10131a; color: #e8f0ff; }
+    h1 { color: #75f6c1; }
+    #songs { display: grid; gap: .65rem; }
+    button { font: inherit; text-align: left; padding: .75rem 1rem; color: inherit;
+      background: #21283a; border: 1px solid #44506e; border-radius: .35rem; cursor: pointer; }
+    button:hover { border-color: #75f6c1; }
+    #status { min-height: 1.5rem; color: #aab7d3; }
+    .volume { display: flex; align-items: center; gap: .75rem; margin: 1rem 0; }
+    .volume input { flex: 1; accent-color: #75f6c1; }
+    .volume output { min-width: 3.5rem; text-align: right; }
+  </style>
+</head>
+<body>
+  <h1>Chiptunes</h1>
+  <p id="status">Choose a song.</p>
+  <label class="volume" for="volume">
+    Volume
+    <input id="volume" type="range" min="0" max="100" value="60" step="1">
+    <output id="volume-value" for="volume">60%</output>
+  </label>
+  <div id="songs"></div>
+  <p><button id="stop">■ Stop</button></p>
+
+  <script type="module">
+    import { ChipPlayer } from "./chip-player.js";
+
+    const player = new ChipPlayer();
+    const list = document.querySelector("#songs");
+    const status = document.querySelector("#status");
+    const volume = document.querySelector("#volume");
+    const volumeValue = document.querySelector("#volume-value");
+
+    volume.addEventListener("input", () => {
+      player.setVolume(Number(volume.value) / 100);
+      volumeValue.value = `${volume.value}%`;
+    });
+
+    try {
+      // The documented conversion command creates the music directory inside
+      // this web directory. Edit this path if your site lays files out differently.
+      const songs = await fetch("./music/manifest.json").then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      });
+      for (const item of songs) {
+        const button = document.createElement("button");
+        button.textContent = `▶ ${item.title} · ${(item.durationMs / 1000).toFixed(1)}s · ${item.bytes} bytes`;
+        button.addEventListener("click", async () => {
+          status.textContent = `Loading ${item.title}…`;
+          try {
+            const song = await player.load(`./music/${encodeURIComponent(item.file)}`);
+            await player.play(song);
+            status.textContent = `Playing ${item.title}`;
+          } catch (error) { status.textContent = error.message; }
+        });
+        list.append(button);
+      }
+    } catch (error) {
+      status.textContent = `Could not load music/manifest.json: ${error.message}`;
+    }
+
+    document.querySelector("#stop").addEventListener("click", () => {
+      player.stop();
+      status.textContent = "Stopped.";
+    });
+  </script>
+</body>
+</html>
